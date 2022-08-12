@@ -1,3 +1,57 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: openvas-data-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/lib/openvas/plugins"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openvas-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: manual
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: notus-data-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/lib/notus"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: notus-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: manual
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,47 +71,18 @@ spec:
       - name: redis-socket
         emptyDir: {}
       - name: nasl-plugins
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: openvas-data-pvc
       - name: notus-data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: notus-data-pvc
       - name: openvas-config
         emptyDir: {}
-      - name: scan-config 
+      - name: ospd-config
+        emptyDir: {}
+      - name: cacerts
         emptyDir: {}
       initContainers:
-      - name: scan-config
-        image: ghcr.io/greenbone/data-objects:community-main
-        imagePullPolicy: Always
-        env:
-          - name: POLICY_ROOT
-            value: "find /var/lib/gvm/data-objects/gvmd/*/*configs -type d"
-        volumeMounts:
-          - name: scan-config
-            mountPath: /mnt
-        command: ['sh', '-c']
-        args: ['install -D -v -m 777 $($POLICY_ROOT | sort -r | head -n 1)/* -t /mnt']
-      - name: nasl
-        image: ghcr.io/greenbone/vulnerability-tests:community-main
-        imagePullPolicy: Always
-        volumeMounts:
-          - name: nasl-plugins
-            mountPath: /mnt/nasl
-        command: ['sh', '-c']
-        args: ['cp -rv /var/lib/openvas/22.04/vt-data/nasl/* /mnt/nasl/']
-      - name: notus-advisories
-        image: ghcr.io/greenbone/notus-data:community
-        imagePullPolicy: Always
-        volumeMounts:
-          - name: notus-data
-            mountPath: /mnt/notus
-        command: ['cp', '-rv', '/var/lib/openvas/plugins/notus/advisories', '/mnt/notus/']
-      - name: notus-products
-        image: ghcr.io/greenbone/notus-data:community
-        imagePullPolicy: Always
-        volumeMounts:
-          - name: notus-data
-            mountPath: /mnt/notus
-        command: ['cp', '-rv', '/var/lib/openvas/plugins/notus/products', '/mnt/notus/']
       - name: mqtt-broker-openvas-fix
         image: greenbone/ospd-openvas:unstable
         imagePullPolicy: Always
@@ -66,6 +91,22 @@ spec:
             mountPath: /mnt/ovc
         command: ['sh', '-c']
         args: ["sed 's/mqtt-broker/localhost/' /etc/openvas/openvas.conf > /mnt/ovc/openvas.conf; cp /etc/openvas/openvas_log.conf /mnt/ovc/"]
+      - name: ospd-tcp-configuration
+        image: greenbone/ospd-openvas:unstable
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: ospd-config
+            mountPath: /mnt/ovc
+        command: ['sh', '-c']
+        args: ["sed 's/unix_socket =.*/bind_address = 0.0.0.0\\nport = 4242/' /etc/gvm/ospd-openvas.conf > /mnt/ovc/ospd-openvas.conf"]
+      - name: create-self-signed-certificates
+        image: greenbone/ospd-openvas:unstable
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: cacerts
+            mountPath: /mnt/vlg
+        command: ['sh', '-c']
+        args: ["mkdir -p /mnt/vlg/CA && mkdir -p /mnt/vlg/private/CA && openssl req -x509 -newkey rsa:4096 -keyout /mnt/vlg/private/CA/serverkey.pem -out /mnt/vlg/CA/cacert.pem -nodes -subj '/CN=localhost' -addext 'subjectAltName = DNS:localhost' -days 365 && cp /mnt/vlg/CA/cacert.pem /mnt/vlg/CA/servercert.pem && chown -R ospd-openvas:ospd-openvas /mnt/vlg/"]
       containers:
       - name: broker
         image: greenbone/mqtt-broker
@@ -86,6 +127,8 @@ spec:
       - name: ospd
         image: greenbone/ospd-openvas:unstable
         imagePullPolicy: Always
+        ports:
+          - containerPort: 4242
         volumeMounts:
         - name: redis-socket
           mountPath: /run/redis
@@ -95,10 +138,24 @@ spec:
           mountPath: /var/lib/notus
         - name: openvas-config
           mountPath: /etc/openvas
-        - name: scan-config 
-          mountPath: /usr/local/src/policies
+        - name: ospd-config
+          mountPath: /etc/gvm/
+        - name: cacerts
+          mountPath: /var/lib/gvm
         securityContext:
           capabilities:
             add:
               - NET_ADMIN
               - NET_RAW
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ospd-tcp
+spec:
+  selector:
+    app: openvas
+  ports:
+    - protocol: TCP
+      port: 4242
+      targetPort: 4242

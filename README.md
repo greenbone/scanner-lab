@@ -50,7 +50,20 @@ Further resources:
 - https://rancher.com/docs/k3s/latest/en/installation/installation-requirements/
 - https://rancher.com/docs/k3s/latest/en/quick-start/
 
+
+### Allow default user to get pods 
+
+To allow the tests to get the target addresses within kubernetes we need to give the default user the capability to do so by executing:
+
+```
+kubectl create rolebinding default-view \
+  --clusterrole=view \
+  --serviceaccount=default:default \
+  --namespace=default
+```
+
 ### Apply deployments
+
 
 ```
 kubectl apply -f openvas.yaml
@@ -93,3 +106,21 @@ OSPD_SOCKET=/run/ospd/ospd-openvas.sock ospd-scans -host 10.42.0.0/24 -policies 
 ```
 kubectl exec -ti deployment/openvas -c ospd -- tail -f /var/log/gvm/openvas.log 
 ```
+
+## Usage
+
+To use the exposed TCP socket to OSPD you have to get the IP-Address of openvas:
+
+```
+kubectl get pods -l app=openvas -o wide
+```
+
+afterwards you can connect to it via:
+
+```
+echo -e "<get_vts/>" | nc 10.42.0.81 4242
+```
+
+### run feature tests
+
+TBD
