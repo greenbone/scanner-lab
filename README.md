@@ -51,17 +51,6 @@ Further resources:
 - https://rancher.com/docs/k3s/latest/en/quick-start/
 
 
-### Allow default user to get pods 
-
-To allow the tests to get the target addresses within kubernetes we need to give the default user the capability to do so by executing:
-
-```
-kubectl create rolebinding default-view \
-  --clusterrole=view \
-  --serviceaccount=default:default \
-  --namespace=default
-```
-
 ### Apply deployments
 
 
