@@ -4,6 +4,7 @@ package findservice
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/greenbone/ospd-openvas/smoketest/nasl"
 	"github.com/greenbone/ospd-openvas/smoketest/policies"
@@ -102,6 +103,9 @@ func (pr *VerifyFoundServicePorts) MissingPorts() ([]string, bool) {
 	return missing, true
 }
 
+// just for debug purposes it will hide the actual run by sending a stop command when all ports found
+var stopWhenFoundAllPorts = false
+
 func startScanPopulateResults(start scan.Start, proto string, sender connection.OSPDSender, mh *VerifyFoundServicePorts) string {
 	var result usecases.GetScanResponseFailure
 	var startR scan.StartResponse
@@ -115,10 +119,12 @@ func startScanPopulateResults(start scan.Start, proto string, sender connection.
 	get := scan.GetScans{ID: startR.ID, PopResults: true}
 
 	for !usecases.ScanStatusFinished(result.Resp.Scan.Status) {
-		// reset to not contain previous results
-		if missing, ok := mh.MissingPorts(); ok && len(missing) == 0 {
-			break
+		if stopWhenFoundAllPorts {
+			if missing, ok := mh.MissingPorts(); ok && len(missing) == 0 {
+				break
+			}
 		}
+		// reset to not contain previous results
 		result.Resp = scan.GetScansResponse{}
 		if err := sender.SendCommand(get, &result.Resp); err != nil {
 			panic(err)
@@ -128,13 +134,14 @@ func startScanPopulateResults(start scan.Start, proto string, sender connection.
 			return fmt.Sprintf("WrongStatusCode: %s", startR.Code)
 		}
 	}
-	stop := scan.Stop{ID: startR.ID}
-	// we try it to stop it no matter what
-	var stopSR scan.StopResponse
-	if err := sender.SendCommand(stop, &stopSR); err != nil {
-		fmt.Printf("Unable to stop scan %s: %s\n", stop.ID, err)
-	} else if stopSR.Code != "200" {
-		fmt.Printf("Unable to stop scan %s: %s (%s)\n", stop.ID, stopSR.Code, stopSR.Text)
+	if stopWhenFoundAllPorts {
+		stop := scan.Stop{ID: startR.ID}
+		var stopSR scan.StopResponse
+		if err := sender.SendCommand(stop, &stopSR); err != nil {
+			fmt.Printf("Unable to stop scan %s: %s\n", stop.ID, err)
+		} else if stopSR.Code != "200" {
+			fmt.Printf("Unable to stop scan %s: %s (%s)\n", stop.ID, stopSR.Code, stopSR.Text)
+		}
 	}
 	mh.Last(result.Resp)
 	if missing, ok := mh.MissingPorts(); ok {
@@ -151,17 +158,15 @@ func startScanPopulateResults(start scan.Start, proto string, sender connection.
 
 func (fs *FindService) Discovery(data *featuretest.ExecInformation) featuretest.Result {
 	cmd := fs.startscan.Convert(data.Targets, []string{"Discovery"}, nil)
+	start := time.Now()
 	r := startScanPopulateResults(cmd, data.Protocoll, data.OSPDAddr, NewVFSP(len(data.Targets), data.Targets))
-	if r != "" {
-		return featuretest.Result{
-			Name:               "discovery",
-			FailureDescription: r,
-		}
+	elapsed := time.Now().Sub(start)
+	return featuretest.Result{
+		Name:               "discovery",
+		FailureDescription: r,
+		Duration:           elapsed,
 	}
 
-	return featuretest.Result{
-		Name: "discovery",
-	}
 }
 
 func New(naslCache *nasl.Cache, policyCache *policies.Cache) *FindService {

@@ -3,6 +3,7 @@ ifndef GO
 endif
 GO_BUILD := CGO_ENABLED=0 GOOS=linux GOARCH=amd64 ${GO} build -o
 DOCKER_BUILD := DOCKER_BUILDKIT=1 docker build
+OSPD_POD := $(shell kubectl get pods -o wide | awk '/openvas/{print $$1}')
 
 all: build-docker
 
@@ -13,9 +14,9 @@ build-cmds:
 build-docker: build-cmds
 	${DOCKER_BUILD} -t greenbone/scanner-lab-feature-tests -f Dockerfile .
 
-# only needed when k3s is not using docker backend
-# https://rancher.com/docs/k3s/latest/en/advanced/#using-docker-as-the-container-runtime
-import-to-k3s: build-docker
-	docker save greenbone/scanner-lab-feature-tests | sudo k3s ctr images import -
-	sudo systemctl restart k3s.service
-	kubectl rollout restart deployment/openvas
+fetch-certs:
+	kubectl cp -c ospd ${OSPD_POD}:/var/lib/gvm/CA/cacert.pem /tmp/ca.pem
+	kubectl cp -c ospd ${OSPD_POD}:/var/lib/gvm/private/CA/serverkey.pem /tmp/key.pem
+
+run: fetch-certs
+	go run ./cmd/ft/main.go --cert-path /tmp/ca.pem --certkey-path /tmp/key.pem 

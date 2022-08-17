@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/greenbone/ospd-openvas/smoketest/vt"
 	"github.com/greenbone/scanner-lab/feature-tests/connection"
 	"github.com/greenbone/scanner-lab/feature-tests/featuretest"
 	"github.com/greenbone/scanner-lab/feature-tests/featuretest/findservice"
