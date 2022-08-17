@@ -10,7 +10,7 @@ import (
 	"github.com/greenbone/ospd-openvas/smoketest/policies"
 	"github.com/greenbone/ospd-openvas/smoketest/scan"
 	"github.com/greenbone/ospd-openvas/smoketest/usecases"
-	"github.com/greenbone/scanner-lab/feature-tests/connection"
+	"github.com/greenbone/ospd-openvas/smoketest/connection"
 	"github.com/greenbone/scanner-lab/feature-tests/converter"
 	"github.com/greenbone/scanner-lab/feature-tests/featuretest"
 	"github.com/greenbone/scanner-lab/feature-tests/kubeutils"

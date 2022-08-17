@@ -3,7 +3,7 @@ module github.com/greenbone/scanner-lab/feature-tests
 go 1.18
 
 require (
-	github.com/greenbone/ospd-openvas/smoketest v0.0.0-20220809083242-c10b8c266034
+	github.com/greenbone/ospd-openvas/smoketest v0.0.0-20220817122601-132c9ef0451e
 	k8s.io/apimachinery v0.24.3
 	k8s.io/client-go v0.24.3
 )
