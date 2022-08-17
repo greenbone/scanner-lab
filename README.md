@@ -1,15 +1,28 @@
-# eulabeia-lab
+# scanner-lab
 
-Is a lab to test openvas in a larger environment.
+Is a repository to simplify testing openvas in a contained environment by using Kubernetes.
+
+This is in an early stage and will be adapted over time.
 
 ## Installation
 
 On a newly created environment you need to have
-- curl
-- victim.yaml
-- openvas.yaml
+
+- make
+- rsync
+- this repository
 
 on your machine.
+
+Requirements:
+
+- `/var/lib/openvas/plugins/`
+- `/var/lib/notus/`
+- `/var/lib/gvm/data-objects/gvmd/22.04/scan-configs/`
+
+must exist and writeable by the user so that `make update-feed` can succeed.
+
+You can verify it by running `make check-feed-dirs`. If there is no output and no error code this is correctly setup.
 
 ### Install k3s
 
@@ -53,27 +66,22 @@ Further resources:
 
 ### Apply deployments
 
-
 ```
-kubectl apply -f openvas.yaml
-kubectl apply -f victim.yaml
-kubectl apply -f slsw.yaml
+make update-feed
+make deploy
 ```
 
 ### Remove deployments
 
 ```
-kubectl delete deployments/openvas
-kubectl delete deployments/victim
-kubectl delete deployments/slsw
+make delete
 ```
 
 ### Update
 
 ```
-kubectl rollout restart -f openvas.yaml
-kubectl rollout restart -f victim.yaml
-kubectl rollout restart -f slsw.yaml
+make update-feed
+make update
 ```
 
 ### Scale
@@ -88,7 +96,13 @@ kubectl scale deployments/slsw --replicas=100
 
 ```
 kubectl exec -ti deployment/openvas -c ospd -- bash
-OSPD_SOCKET=/run/ospd/ospd-openvas.sock ospd-scans -host 10.42.0.0/24 -policies "Discovery,Full and fast" -cmd start-finish
+ospd-scans \
+  -a localhost:4242 \
+  --cert-path /var/lib/gvm/CA/cacert.pem \
+  --certkey-path /var/lib/gvm/private/CA/serverkey.pem \
+  --host 10.42.0.0/24 \
+  --policies "Discovery,Full and fast" \
+  --cmd start-finish
 ```
 
 ### openvas logs
@@ -104,12 +118,26 @@ To use the exposed TCP socket to OSPD you have to get the IP-Address of openvas:
 kubectl get pods -l app=openvas -o wide
 ```
 
+and the certificate and key file:
+```
+cd feature-tests
+make fetch-certs
+```
+
 afterwards you can connect to it via:
 
 ```
-echo -e "<get_vts/>" | nc 10.42.0.81 4242
+echo "<get_version/>" | gnutls-cli \
+  --port=4242 \
+  --insecure \
+  --x509certfile=/tmp/ca.pem \
+  --x509keyfile=/tmp/key.pem \
+  $(kubectl get pods -o wide | awk '/openvas/{print $6}')
 ```
 
 ### run feature tests
 
-TBD
+```
+cd ./feature-tests
+make run
+```

@@ -1,6 +1,33 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
+  name: scanconfig-data-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/var/lib/gvm/data-objects/gvmd/22.04/scan-configs"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scanconfig-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: manual
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
   name: openvas-data-pv
   labels:
     type: local
@@ -78,6 +105,9 @@ spec:
           claimName: notus-data-pvc
       - name: openvas-config
         emptyDir: {}
+      - name: scan-config 
+        persistentVolumeClaim:
+          claimName: scanconfig-data-pvc 
       - name: ospd-config
         emptyDir: {}
       - name: cacerts
@@ -107,6 +137,7 @@ spec:
             mountPath: /mnt/vlg
         command: ['sh', '-c']
         args: ["mkdir -p /mnt/vlg/CA && mkdir -p /mnt/vlg/private/CA && openssl req -x509 -newkey rsa:4096 -keyout /mnt/vlg/private/CA/serverkey.pem -out /mnt/vlg/CA/cacert.pem -nodes -subj '/CN=localhost' -addext 'subjectAltName = DNS:localhost' -days 365 && cp /mnt/vlg/CA/cacert.pem /mnt/vlg/CA/servercert.pem && chown -R ospd-openvas:ospd-openvas /mnt/vlg/"]
+
       containers:
       - name: broker
         image: greenbone/mqtt-broker
@@ -130,6 +161,8 @@ spec:
         ports:
           - containerPort: 4242
         volumeMounts:
+        - name: scan-config
+          mountPath: /usr/local/src/policies
         - name: redis-socket
           mountPath: /run/redis
         - name: nasl-plugins
