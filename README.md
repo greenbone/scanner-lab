@@ -92,6 +92,20 @@ kubectl scale deployments/slsw --replicas=100
 
 ## Useful commands
 
+### Use own paths instead of defaults
+
+If you want to use different source paths than set you can create a own `openvas-persistent-volumes-deployment-local.yaml` by executing:
+
+```
+make \
+  nasl_target=$YOUR_NASL_PATH \
+  notus_target=$YOUR_NOTUS_PATH \
+  sc_target=$YOUR_SCAN_CONFIG_PATH \
+  create-local-volume-deployment
+```
+
+Be aware that when you want to run `make update-feed` you need to apply the same values as you did when creating `openvas-persistent-volumes-deployment-local.yaml`
+
 ### start a scan
 
 ```
@@ -141,3 +155,5 @@ echo "<get_version/>" | gnutls-cli \
 cd ./feature-tests
 make run
 ```
+
+
