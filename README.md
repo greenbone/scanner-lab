@@ -92,7 +92,17 @@ kubectl scale deployments/slsw --replicas=100
 
 ## Useful commands
 
+
 ### Use own paths instead of defaults
+
+If you follow the standard setup
+
+- $YOUR_PATH/lib/openvas/plugins
+- $YOUR_PATH/lib/notus
+- $YOUR_PATH/lib/gvm/data-objects/gvmd/22.04/scan-configs
+
+
+but just in a different path you can also set `INSTALL_PREFIX` either via environment or make variable instead of overriding each feed variable before executing `create-local-volume-deployment`.
 
 If you want to use different source paths than set you can create a own `openvas-persistent-volumes-deployment-local.yaml` by executing:
 
