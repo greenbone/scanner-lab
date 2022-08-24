@@ -2,13 +2,18 @@ RSYNC := rsync -ltvrP --delete --exclude private/ --perms --chmod=Fugo+r,Fug+w,D
 RSYNC_BASE := rsync://feed.community.greenbone.net:
 VERSION := 22.04
 
-NASL_TARGET_DEFAULT := ${INSTALL_PREFIX}/var/lib/openvas/plugins
+ifndef INSTALL_PREFIX
+	INSTALL_PREFIX := /var
+endif
+
+NASL_TARGET_DEFAULT := /var/lib/openvas/plugins
 nasl_target := ${NASL_TARGET_DEFAULT}
 
-NOTUS_TARGET_DEFAULT := ${INSTALL_PREFIX}/var/lib/notus
+NOTUS_TARGET_DEFAULT := /var/lib/notus
 notus_target := ${NOTUS_TARGET_DEFAULT}
 
-SC_TARGET_DEFAULT := ${INSTALL_PREFIX}/var/lib/gvm/data-objects/gvmd/22.04/scan-configs
+SC_TARGET_DEFAULT := /var/lib/gvm/data-objects/gvmd/22.04/scan-configs
+>>>>>>> e229bc1 (Fix: creating local deployment file)
 sc_target := ${SC_TARGET_DEFAULT}
 
 PVD := openvas-persistent-volumes-deployment.yaml
