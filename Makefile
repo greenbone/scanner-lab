@@ -13,7 +13,6 @@ NOTUS_TARGET_DEFAULT := /var/lib/notus
 notus_target := ${NOTUS_TARGET_DEFAULT}
 
 SC_TARGET_DEFAULT := /var/lib/gvm/data-objects/gvmd/22.04/scan-configs
->>>>>>> e229bc1 (Fix: creating local deployment file)
 sc_target := ${SC_TARGET_DEFAULT}
 
 PVD := openvas-persistent-volumes-deployment.yaml
