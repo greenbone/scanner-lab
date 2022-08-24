@@ -2,18 +2,14 @@ RSYNC := rsync -ltvrP --delete --exclude private/ --perms --chmod=Fugo+r,Fug+w,D
 RSYNC_BASE := rsync://feed.community.greenbone.net:
 VERSION := 22.04
 
-ifndef INSTALL_PREFIX
-	INSTALL_PREFIX := /var
-endif
-
 NASL_TARGET_DEFAULT := /var/lib/openvas/plugins
-nasl_target := ${NASL_TARGET_DEFAULT}
+nasl_target := ${INSTALL_PREFIX}${NASL_TARGET_DEFAULT}
 
 NOTUS_TARGET_DEFAULT := /var/lib/notus
-notus_target := ${NOTUS_TARGET_DEFAULT}
+notus_target := ${INSTALL_PREFIX}${NOTUS_TARGET_DEFAULT}
 
 SC_TARGET_DEFAULT := /var/lib/gvm/data-objects/gvmd/22.04/scan-configs
-sc_target := ${SC_TARGET_DEFAULT}
+sc_target := ${INSTALL_PREFIX}${SC_TARGET_DEFAULT}
 
 PVD := openvas-persistent-volumes-deployment.yaml
 PVD_LOCAL := openvas-persistent-volumes-deployment-local.yaml
@@ -26,8 +22,8 @@ endif
 
 create-local-volume-deployment:
 	sed 's|${NASL_TARGET_DEFAULT}|${nasl_target}|' ${PVD} > ${PVD_LOCAL}
-	sed 's|${NOTUS_TARGET_DEFAULT}|${notus_target}|' ${PVD} > ${PVD_LOCAL}
-	sed 's|${SC_TARGET_DEFAULT}|${sc_target}|' ${PVD} > ${PVD_LOCAL}
+	sed -i 's|${NOTUS_TARGET_DEFAULT}|${notus_target}|' ${PVD_LOCAL}
+	sed -i 's|${SC_TARGET_DEFAULT}|${sc_target}|' ${PVD_LOCAL}
 
 check-persistent-volume-paths:
 	@ grep "${nasl_target}" ${pvd} > /dev/null || (printf "\e[31m${nasl_target} not configured in ${pvd}\e[0m\n" && false)

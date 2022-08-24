@@ -114,6 +114,12 @@ make \
 ```
 
 Be aware that when you want to run `make update-feed` you need to apply the same values as you did when creating `openvas-persistent-volumes-deployment-local.yaml`
+If you change the `INSTALL_PREFIX` then you have to delete the persistent volume and openvas and deploy afterwards:
+
+```
+make delete-persistant-volumes
+make deploy-openvas
+```
 
 ### start a scan
 
