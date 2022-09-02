@@ -1,3 +1,13 @@
+ifndef GITHUB_REPOSITORY_OWNER
+	GITHUB_REPOSITORY_OWNER := greenbone
+endif
+
+ifndef SL_C_REGISTRY
+	SL_C_REGISTRY := ghcr.io/${GITHUB_REPOSITORY_OWNER}
+endif
+
+DEFAULT_SL_C_REGISTRY := ghcr.io/greenbone
+ 
 RSYNC := rsync -ltvrP --delete --exclude private/ --perms --chmod=Fugo+r,Fug+w,Dugo-s,Dugo+rx,Dug+w
 RSYNC_BASE := rsync://feed.community.greenbone.net:
 VERSION := 22.04
@@ -20,12 +30,32 @@ else
 	pvd := ${PVD_LOCAL}
 endif
 
+ifeq ($(wildcard slackware-deployment-local.yaml),)
+	slackware-depl := slackware-deployment.yaml 
+else
+	slackware-depl := slackware-deployment-local.yaml 
+endif
+
+ifeq ($(wildcard slsw-deployment-local.yaml),)
+	slsw-depl := slsw-deployment.yaml 
+else
+	slsw-depl := slsw-deployment-local.yaml 
+endif
+
 all: deploy
 
 create-local-volume-deployment:
 	sed 's|${NASL_TARGET_DEFAULT}|${nasl_target}|' ${PVD} > ${PVD_LOCAL}
 	sed -i 's|${NOTUS_TARGET_DEFAULT}|${notus_target}|' ${PVD_LOCAL}
 	sed -i 's|${SC_TARGET_DEFAULT}|${sc_target}|' ${PVD_LOCAL}
+
+# changes the deployment files for repository build images
+# this is done so that forks can simply change the address
+# and use their published image instead of officials
+create-local-sl-deployment:
+	sed 's|${DEFAULT_SL_C_REGISTRY}|${SL_C_REGISTRY}|' slackware-deployment.yaml > slackware-deployment-local.yaml
+	sed 's|${DEFAULT_SL_C_REGISTRY}|${SL_C_REGISTRY}|' slsw-deployment.yaml > slsw-deployment-local.yaml
+
 
 check-persistent-volume-paths:
 	@ grep "${nasl_target}" ${pvd} > /dev/null || (printf "\e[31m${nasl_target} not configured in ${pvd}\e[0m\n" && false)
@@ -55,10 +85,10 @@ deploy-victim:
 	kubectl apply -f victim-deployment.yaml
 
 deploy-slsw:
-	kubectl apply -f slsw-deployment.yaml
+	kubectl apply -f ${slsw-deply}
 
 deploy-slackware:
-	kubectl apply -f slackware-deployment.yaml
+	kubectl apply -f ${slackware-depl}
 
 deploy: deploy-openvas deploy-victim deploy-slackware deploy-slsw
 
@@ -92,3 +122,11 @@ update-slackware:
 	kubectl rollout restart deployment/slackware
 
 update: update-openvas update-victim update-slackware update-slsw
+
+build:
+	$(MAKE) -C slsw build
+	$(MAKE) -C slackware build
+
+push:
+	$(MAKE) -C slsw push
+	$(MAKE) -C slackware push

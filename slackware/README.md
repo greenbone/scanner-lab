@@ -9,7 +9,11 @@ To get all installed packages so that you can create your own product definition
 make gather-packagelist
 ```
 
-this does create a `packages.lst` file containing all installed packages within the slackware image.
+This does create a `packages.lst` file containing all installed packages within the slackware image.
+
+The private ssh host keys are stored within the repository itself to prevent each image iteration to have a different key; since the image itself is public there are already possibility to gain them.
+
+They are stored in the format `${IMAGE_TAG}_${ALGORI}_key(.pub)?`
 
 
 ## How to build
@@ -35,3 +39,9 @@ make import-into-k3s
 to build and import a new image of slackware into k3s.
 
 
+## How to generate keys
+
+
+```
+make generate-host-ssh-keys
+```

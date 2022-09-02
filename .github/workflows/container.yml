@@ -15,7 +15,4 @@ jobs:
           registry: ghcr.io
           username: ${{ secrets.GREENBONE_BOT }}
           password: ${{ secrets.GREENBONE_BOT_TOKEN }}
-      - run: cd slsw && DOCKER_BUILDKIT=1 docker build --label org.opencontainers.image.vendor=Greenbone --label org.opencontainers.image.source="https://github.com/${{ github.repository }}" -t ghcr.io/${{ github.repository }}-simulate-website .
-      - run: docker push ghcr.io/${{ github.repository }}-simulate-website
-      - run: cd slackware && DOCKER_BUILDKIT=1 docker build --label org.opencontainers.image.vendor=Greenbone --label org.opencontainers.image.source="https://github.com/${{ github.repository }}" -t ghcr.io/${{ github.repository }}-slackware .
-      - run: docker push ghcr.io/${{ github.repository }}-slackware
+      - run: make push
