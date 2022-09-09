@@ -1,0 +1,27 @@
+{
+    "version": "1.0",
+    "family": "Slackware Local Security Checks",
+    "advisories": [
+        {
+            "oid": "0.0.0.0.0.0.0.0.0.0.0.1.01",
+            "title": "Slackware: Security Advisory (SSA:2003-141-01)",
+            "creation_date": TBS,
+            "last_modification": TBS,
+            "advisory_id": "SSA:FAKE",
+            "advisory_xref": "",
+            "cves": [],
+            "summary": "A fake advisory for testing purposes only.",
+            "insight": "This advisory is used to verify Notus functionality.",
+            "affected": "Each package but aaa_base installed on the container image",
+            "impact": null,
+            "xrefs": [],
+            "qod_type": "package",
+            "severity": {
+                "origin": "Greenbone",
+                "date": TBS,
+                "cvss_v2": "AV:N/AC:L/Au:N/C:P/I:N/A:N",
+                "cvss_v3": null
+            }
+        }
+    ]
+}
