@@ -67,9 +67,15 @@ Further resources:
 ### Apply deployments
 
 ```
-make update-feed
 make deploy
 ```
+
+To update your local feed you can execute:
+
+```
+make update-local-feed
+```
+
 
 ### Remove deployments
 
@@ -80,7 +86,7 @@ make delete
 ### Update
 
 ```
-make update-feed
+make update-local-feed
 make update
 ```
 

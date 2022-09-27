@@ -17,16 +17,13 @@ spec:
       - name: redis-socket
         emptyDir: {}
       - name: nasl-plugins
-        persistentVolumeClaim:
-          claimName: openvas-data-pvc
+        emptyDir: {}
       - name: notus-data
-        persistentVolumeClaim:
-          claimName: notus-data-pvc
+        emptyDir: {}
       - name: openvas-config
         emptyDir: {}
       - name: scan-config 
-        persistentVolumeClaim:
-          claimName: scanconfig-data-pvc 
+        emptyDir: {}
       - name: ospd-config
         emptyDir: {}
       - name: cacerts
@@ -34,6 +31,39 @@ spec:
       - name: ospd-logs
         emptyDir: {}
       initContainers:
+      - name: scan-config
+        image: greenbone/data-objects
+        imagePullPolicy: Always
+        env:
+          - name: POLICY_ROOT
+            value: "find /var/lib/gvm/data-objects/gvmd/*/*configs -type d"
+        volumeMounts:
+          - name: scan-config
+            mountPath: /mnt
+        command: ['sh', '-c']
+        args: ['install -D -v -m 777 $($POLICY_ROOT | sort -r | head -n 1)/* -t /mnt']
+      - name: nasl
+        image: greenbone/vulnerability-tests
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: nasl-plugins
+            mountPath: /mnt/nasl
+        command: ['sh', '-c']
+        args: ['cp -rv /var/lib/openvas/22.04/vt-data/nasl/* /mnt/nasl/']
+      - name: notus-advisories
+        image: greenbone/notus-data
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: notus-data
+            mountPath: /mnt/notus
+        command: ['cp', '-rv', '/var/lib/notus/advisories', '/mnt/notus/']
+      - name: notus-products
+        image: greenbone/notus-data
+        imagePullPolicy: Always
+        volumeMounts:
+          - name: notus-data
+            mountPath: /mnt/notus
+        command: ['cp', '-rv', '/var/lib/notus/products', '/mnt/notus/']
       - name: mqtt-broker-openvas-fix
         image: greenbone/ospd-openvas:unstable
         imagePullPolicy: Always

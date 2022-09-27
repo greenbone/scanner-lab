@@ -41,14 +41,11 @@ func (pr *VerifyFoundServicePorts) mayAdd(host string, port string) {
 				if _, ok := sp[port]; !ok {
 					sp[port] = true
 					pr.FoundServicePorts[host] = sp
-					fmt.Printf("Add %s:%s\n", host, port)
 				}
 			} else {
 				sp = make(map[string]bool)
 				sp[port] = true
 				pr.FoundServicePorts[host] = sp
-				fmt.Printf("Add %s:%s\n", host, port)
-
 			}
 		}
 
