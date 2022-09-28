@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/greenbone/ospd-openvas/smoketest/connection"
 	"github.com/greenbone/ospd-openvas/smoketest/nasl"
 	"github.com/greenbone/ospd-openvas/smoketest/policies"
 	"github.com/greenbone/ospd-openvas/smoketest/scan"
 	"github.com/greenbone/ospd-openvas/smoketest/usecases"
-	"github.com/greenbone/ospd-openvas/smoketest/connection"
 	"github.com/greenbone/scanner-lab/feature-tests/converter"
 	"github.com/greenbone/scanner-lab/feature-tests/featuretest"
 	"github.com/greenbone/scanner-lab/feature-tests/kubeutils"
@@ -103,15 +103,15 @@ func (pr *VerifyFoundServicePorts) MissingPorts() ([]string, bool) {
 // just for debug purposes it will hide the actual run by sending a stop command when all ports found
 var stopWhenFoundAllPorts = false
 
-func startScanPopulateResults(start scan.Start, proto string, sender connection.OSPDSender, mh *VerifyFoundServicePorts) string {
+func startScanPopulateResults(start scan.Start, proto string, sender connection.OSPDSender, mh *VerifyFoundServicePorts) (string, error) {
 	var result usecases.GetScanResponseFailure
 	var startR scan.StartResponse
 
 	if err := sender.SendCommand(start, &startR); err != nil {
-		panic(err)
+		return "", err
 	}
 	if startR.Code != "200" {
-		return fmt.Sprintf("WrongStatusCode: %s", startR.Code)
+		return fmt.Sprintf("WrongStatusCode: %s", startR.Code), nil
 	}
 	get := scan.GetScans{ID: startR.ID, PopResults: true}
 
@@ -124,11 +124,11 @@ func startScanPopulateResults(start scan.Start, proto string, sender connection.
 		// reset to not contain previous results
 		result.Resp = scan.GetScansResponse{}
 		if err := sender.SendCommand(get, &result.Resp); err != nil {
-			panic(err)
+			return "", err
 		}
 		mh.Each(result.Resp)
 		if result.Resp.Code != "200" {
-			return fmt.Sprintf("WrongStatusCode: %s", startR.Code)
+			return fmt.Sprintf("WrongStatusCode: %s", startR.Code), nil
 		}
 	}
 	if stopWhenFoundAllPorts {
@@ -143,20 +143,26 @@ func startScanPopulateResults(start scan.Start, proto string, sender connection.
 	mh.Last(result.Resp)
 	if missing, ok := mh.MissingPorts(); ok {
 		if len(missing) != 0 {
-			return fmt.Sprintf("ports: %+v not found.", missing)
+			return fmt.Sprintf("ports: %+v not found.", missing), nil
 		}
 
 	} else {
-		return "No host information returned"
+		return "No host information returned", nil
 	}
-	return ""
+	return "", nil
 
 }
 
 func (fs *FindService) Discovery(data *featuretest.ExecInformation) featuretest.Result {
 	cmd := fs.startscan.Convert(data.Targets, []string{"Discovery"}, nil)
 	start := time.Now()
-	r := startScanPopulateResults(cmd, data.Protocoll, data.OSPDAddr, NewVFSP(len(data.Targets), data.Targets))
+	r, err := startScanPopulateResults(cmd, data.Protocoll, data.OSPDAddr, NewVFSP(len(data.Targets), data.Targets))
+	if err != nil {
+		return featuretest.Result{
+			Name:               "discovery",
+			FailureDescription: fmt.Sprintf("unable to start: %s", err.Error()),
+		}
+	}
 	elapsed := time.Now().Sub(start)
 	return featuretest.Result{
 		Name:               "discovery",

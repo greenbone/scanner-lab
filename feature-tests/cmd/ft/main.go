@@ -28,6 +28,7 @@ import (
 	"github.com/greenbone/scanner-lab/feature-tests/featuretest"
 	"github.com/greenbone/scanner-lab/feature-tests/featuretest/findservice"
 	"github.com/greenbone/scanner-lab/feature-tests/kubeutils"
+	"github.com/greenbone/scanner-lab/feature-tests/sink"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -48,6 +49,9 @@ func main() {
 	policyPath := flag.String("policy-path", "/var/lib/gvm/data-objects/gvmd/22.04/scan-configs", "(optional) path to policies.")
 	certPath := flag.String("cert-path", "/var/lib/gvm/CA/servercert.pem", "(optional) path to the certificate used by ospd.")
 	certKeyPath := flag.String("certkey-path", "/var/lib/gvm/private/CA/serverkey.pem", "(optional) path to certificate key used by ospd.")
+	mattermostChannelID := flag.String("mattermost-channel-id", "wsgmdikbjiyn8m5ifa5njqngwr", "(optional) a channel id to send mattermost messages to")
+	mattermostToken := flag.String("mattermost-token", "", "password for mattermost user; can also be env variable: MATTERMOST_TOKEN")
+	mattermostAddress := flag.String("mattermost-address", "https://mattermost.greenbone.net", "The address of the mattermost server.")
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
@@ -55,6 +59,11 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "(optional) absolute path to the kubeconfig file")
 	}
 	flag.Parse()
+	if *mattermostToken == "" {
+		if mt, ok := os.LookupEnv("MATTERMOST_TOKEN"); ok {
+			*mattermostToken = mt
+		}
+	}
 
 	var config *rest.Config
 	if f, err := os.Open(*kubeconfig); err != nil {
@@ -89,15 +98,24 @@ func main() {
 	address := fmt.Sprintf("%s:%s", ospd.IP, ospd.ExposedPorts[0])
 	sender := connection.New("tcp", address, *certPath, *certKeyPath, false)
 
-	d, err := featuretest.New(pods, *vtDIR, *policyPath, sender)
+	m, err := sink.NewMattermost(*mattermostAddress, *mattermostChannelID, *mattermostToken)
 	if err != nil {
 		panic(err.Error())
 	}
+
+	d, err := featuretest.New(pods, *vtDIR, *policyPath, sender)
+	if err != nil {
+		m.Error(err)
+		panic(err.Error())
+	}
 	fst := findservice.New(d.NASLCache, d.PolicyCache)
+
 	d.RegisterTest(fst.Discovery)
 	if results, err := d.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error while running the tests: %s", err)
+		m.Error(err)
+		panic(err.Error())
 	} else {
+		m.Send(results)
 		for _, r := range results {
 			fmt.Printf("%s: %s took %s", r.Name, r.FailureDescription, r.Duration)
 		}

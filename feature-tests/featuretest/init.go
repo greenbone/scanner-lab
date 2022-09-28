@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/greenbone/ospd-openvas/smoketest/connection"
 	"github.com/greenbone/ospd-openvas/smoketest/nasl"
 	"github.com/greenbone/ospd-openvas/smoketest/policies"
-	"github.com/greenbone/ospd-openvas/smoketest/connection"
 	"github.com/greenbone/scanner-lab/feature-tests/kubeutils"
 )
 
