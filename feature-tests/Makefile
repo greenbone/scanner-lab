@@ -14,9 +14,5 @@ build-cmds:
 build-docker: build-cmds
 	${DOCKER_BUILD} -t greenbone/scanner-lab-feature-tests -f Dockerfile .
 
-fetch-certs:
-	kubectl cp -c ospd ${OSPD_POD}:/var/lib/gvm/CA/cacert.pem /tmp/ca.pem
-	kubectl cp -c ospd ${OSPD_POD}:/var/lib/gvm/private/CA/serverkey.pem /tmp/key.pem
-
-run: fetch-certs
-	go run ./cmd/ft/main.go --cert-path /tmp/ca.pem --certkey-path /tmp/key.pem 
+run:
+	go run ./cmd/ft/main.go

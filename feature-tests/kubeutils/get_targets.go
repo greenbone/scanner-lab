@@ -5,7 +5,14 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/cmd/cp"
+	"k8s.io/kubectl/pkg/cmd/util"
 )
 
 var portlookup = map[string][]string{
@@ -15,6 +22,7 @@ var portlookup = map[string][]string{
 
 type Target struct {
 	App          string
+	ID           string
 	IP           string
 	ExposedPorts []string
 }
@@ -53,10 +61,65 @@ func GetPodIPsLabel(clientset *kubernetes.Clientset, namespace string) ([]Target
 				App:          app,
 				IP:           pod.Status.PodIP,
 				ExposedPorts: exposedPorts,
+				ID:           pod.Name,
 			}
 			result = append(result, t)
 			i++
 		}
 	}
 	return result, nil
+}
+
+type PodCopy interface {
+	FromPod(sourceFilePath, destinationFilePath string) error
+}
+
+type podCP struct {
+	RestConfig *rest.Config
+	ClientSet  *kubernetes.Clientset
+	Container  string
+	Pod        string
+}
+
+func NewPodCP(
+	config rest.Config,
+	clientset *kubernetes.Clientset,
+	container, pod string) PodCopy {
+
+	config.APIPath = "/api"
+	config.GroupVersion = &schema.GroupVersion{Version: "v1"}
+	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: scheme.Codecs}
+
+	return &podCP{
+		RestConfig: &config,
+		ClientSet:  clientset,
+		Container:  container,
+		Pod:        pod,
+	}
+
+}
+
+func (p *podCP) FromPod(sourceFilePath, destinationFilePath string) error {
+	ioStreams, _, out, errout := genericclioptions.NewTestIOStreams()
+
+	var copt genericclioptions.RESTClientGetter = &genericclioptions.ConfigFlags{
+		WrapConfigFn: func(c *rest.Config) *rest.Config {
+			return p.RestConfig
+		},
+	}
+
+	nf := util.NewFactory(copt)
+	cmd := cp.NewCmdCp(nf, ioStreams)
+
+	sourceFilePath = p.Pod + ":" + sourceFilePath
+	cmd.SetArgs([]string{"-c", p.Container, sourceFilePath, destinationFilePath})
+
+	err := cmd.Execute()
+	if err != nil {
+		return fmt.Errorf(
+			"%s; out: %s; err out: %s",
+			err.Error(), out.String(), errout.String(),
+		)
+	}
+	return nil
 }
