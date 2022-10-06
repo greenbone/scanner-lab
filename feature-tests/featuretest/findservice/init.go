@@ -4,9 +4,7 @@ package findservice
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/greenbone/ospd-openvas/smoketest/connection"
 	"github.com/greenbone/ospd-openvas/smoketest/nasl"
 	"github.com/greenbone/ospd-openvas/smoketest/policies"
 	"github.com/greenbone/ospd-openvas/smoketest/scan"
@@ -18,6 +16,7 @@ import (
 
 type FindService struct {
 	startscan converter.TargetStartScanConverter
+	data      *featuretest.ExecInformation
 }
 type VerifyFoundServicePorts struct {
 	Targets []kubeutils.Target
@@ -52,14 +51,6 @@ func (pr *VerifyFoundServicePorts) mayAdd(host string, port string) {
 	}
 }
 
-func (pr *VerifyFoundServicePorts) Each(resp scan.GetScansResponse) {
-
-	for _, r := range resp.Scan.Results.Results {
-		pr.mayAdd(r.Host, r.Port)
-	}
-
-}
-
 func (pr *VerifyFoundServicePorts) findTarget(h string) (*kubeutils.Target, error) {
 	for _, t := range pr.Targets {
 		if t.IP == h {
@@ -70,7 +61,7 @@ func (pr *VerifyFoundServicePorts) findTarget(h string) (*kubeutils.Target, erro
 
 }
 
-func (pr *VerifyFoundServicePorts) Last(resp scan.GetScansResponse) {
+func (pr *VerifyFoundServicePorts) Add(resp scan.GetScansResponse) {
 	for _, r := range resp.Scan.Results.Results {
 		pr.mayAdd(r.Host, r.Port)
 	}
@@ -82,7 +73,6 @@ func (pr *VerifyFoundServicePorts) MissingPorts() ([]string, bool) {
 	}
 	missing := make([]string, 0, len(pr.Targets))
 	for k, v := range pr.FoundServicePorts {
-		fmt.Printf("checking %s", k)
 		if t, err := pr.findTarget(k); err == nil {
 			for _, p := range t.RequiredFoundPorts() {
 				for k := range v {
@@ -92,88 +82,47 @@ func (pr *VerifyFoundServicePorts) MissingPorts() ([]string, bool) {
 				}
 				missing = append(missing, p)
 			found:
+				// needed to continue parent loop without having to loop through RequiredPorts
 			}
-			fmt.Printf(" missing: %+v\n", missing)
 		}
 
 	}
 	return missing, true
 }
 
-// just for debug purposes it will hide the actual run by sending a stop command when all ports found
-var stopWhenFoundAllPorts = false
+func (fs *FindService) Name() string {
+	return "Full and fast"
+}
 
-func startScanPopulateResults(start scan.Start, proto string, sender connection.OSPDSender, mh *VerifyFoundServicePorts) (string, error) {
-	var result usecases.GetScanResponseFailure
-	var startR scan.StartResponse
+func (fs *FindService) Start() scan.Start {
+	// we always have to start Discovery first to enable full and fast requirements
+	return fs.startscan.Convert(fs.data.Targets, []string{"Discovery", fs.Name()}, nil)
+}
 
-	if err := sender.SendCommand(start, &startR); err != nil {
-		return "", err
-	}
-	if startR.Code != "200" {
-		return fmt.Sprintf("WrongStatusCode: %s", startR.Code), nil
-	}
-	get := scan.GetScans{ID: startR.ID, PopResults: true}
+func (fs *FindService) Verify(resp *usecases.GetScanResponseFailure) featuretest.Result {
+	data := fs.data
 
-	for !usecases.ScanStatusFinished(result.Resp.Scan.Status) {
-		if stopWhenFoundAllPorts {
-			if missing, ok := mh.MissingPorts(); ok && len(missing) == 0 {
-				break
-			}
-		}
-		// reset to not contain previous results
-		result.Resp = scan.GetScansResponse{}
-		if err := sender.SendCommand(get, &result.Resp); err != nil {
-			return "", err
-		}
-		mh.Each(result.Resp)
-		if result.Resp.Code != "200" {
-			return fmt.Sprintf("WrongStatusCode: %s", startR.Code), nil
-		}
-	}
-	if stopWhenFoundAllPorts {
-		stop := scan.Stop{ID: startR.ID}
-		var stopSR scan.StopResponse
-		if err := sender.SendCommand(stop, &stopSR); err != nil {
-			fmt.Printf("Unable to stop scan %s: %s\n", stop.ID, err)
-		} else if stopSR.Code != "200" {
-			fmt.Printf("Unable to stop scan %s: %s (%s)\n", stop.ID, stopSR.Code, stopSR.Text)
-		}
-	}
-	mh.Last(result.Resp)
-	if missing, ok := mh.MissingPorts(); ok {
+	vfsp := NewVFSP(len(data.Targets), data.Targets)
+	vfsp.Add(resp.Resp)
+	var failure string
+	if missing, ok := vfsp.MissingPorts(); ok {
 		if len(missing) != 0 {
-			return fmt.Sprintf("ports: %+v not found.", missing), nil
+			failure = fmt.Sprintf("ports: %+v not found.", missing)
 		}
-
 	} else {
-		return "No host information returned", nil
+		failure = "No known host information found."
 	}
-	return "", nil
-
-}
-
-func (fs *FindService) Discovery(data *featuretest.ExecInformation) featuretest.Result {
-	cmd := fs.startscan.Convert(data.Targets, []string{"Discovery"}, nil)
-	start := time.Now()
-	r, err := startScanPopulateResults(cmd, data.Protocoll, data.OSPDAddr, NewVFSP(len(data.Targets), data.Targets))
-	if err != nil {
-		return featuretest.Result{
-			Name:               "discovery",
-			FailureDescription: fmt.Sprintf("unable to start: %s", err.Error()),
-		}
-	}
-	elapsed := time.Now().Sub(start)
 	return featuretest.Result{
-		Name:               "discovery",
-		FailureDescription: r,
-		Duration:           elapsed,
+		Name:               fs.Name(),
+		FailureDescription: failure,
+		Resp:               &resp.Resp,
 	}
 
 }
 
-func New(naslCache *nasl.Cache, policyCache *policies.Cache) *FindService {
+func New(data *featuretest.ExecInformation) featuretest.Runner {
 	return &FindService{
-		startscan: converter.NewTargetStartScan(naslCache, policyCache),
+		startscan: converter.NewTargetStartScan(data.NASLCache, data.PolicyCache),
+		data:      data,
 	}
 }

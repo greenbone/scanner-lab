@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Note: the example only works with the code within the same release/branch.
 package main
 
 import (
@@ -63,6 +62,8 @@ func main() {
 	if *mattermostToken == "" {
 		if mt, ok := os.LookupEnv("MATTERMOST_TOKEN"); ok {
 			*mattermostToken = mt
+		} else {
+			fmt.Printf("no MATTERMOST_TOKEN is set. Results will be printed into stdout only.\n")
 		}
 	}
 
@@ -81,18 +82,28 @@ func main() {
 
 	}
 
+	errRetry := 0
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err.Error())
 	}
 	// get pods
+retry:
 	pods, err := kubeutils.GetPodIPsLabel(clientset, "default")
 	if err != nil {
+		errRetry += 1
+		if errRetry < 10 {
+			goto retry
+		}
 		panic(err.Error())
 	}
 	ospd, err := findFirstOpenVAS(pods)
 	if err != nil {
+		errRetry += 1
+		if errRetry < 10 {
+			goto retry
+		}
 		panic(err.Error())
 	}
 	pd := kubeutils.NewPodCP(*config, clientset, "ospd", ospd.ID)
@@ -123,13 +134,12 @@ func main() {
 		m.Error(err)
 		panic(err.Error())
 	}
-	fst := findservice.New(d.NASLCache, d.PolicyCache)
+	fst := findservice.New(&d.ExecInformation)
 
-	d.RegisterTest(fst.Discovery)
+	d.RegisterTest(fst)
 	if results, err := d.Run(); err != nil {
 		if *mattermostToken != "" {
 			m.Error(err)
-
 		}
 		panic(err.Error())
 	} else {
