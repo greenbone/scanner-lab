@@ -6,6 +6,9 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -14,5 +17,5 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ secrets.GREENBONE_BOT }}
-          password: ${{ secrets.GREENBONE_BOT_TOKEN }}
+          password: ${{ secrets.GREENBONE_BOT_PACKAGES_WRITE_TOKEN }}
       - run: make push
