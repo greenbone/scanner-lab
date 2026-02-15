@@ -24,11 +24,29 @@ jobs:
     - name: Prepare
       run: |
         make prepare-release
+
+    - name: Install git-cliff
+      uses: greenbone/actions/uv@v3
+      with:
+        install: git-cliff
+
     - name: Changelog
       id: prepare_changelog
       run: |
-        pontos-changelog || (git log --oneline | grep "Add" | sed "s/.*Add[: ]*/* /" > .changelog.md)
-        [ ! -f ".changelog.md" ] && tail -n +7 changelog/*.md | head -n -2 | sed 's/##/#/' > .changelog.md
+        # Get previous tag (if exists)
+        PREV_TAG=$(git tag --sort=-creatordate | grep -v "$(basename $GITHUB_REF)" | head -n1)
+        # If no previous tag, use initial commit
+        if [ -z "$PREV_TAG" ]; then
+          RANGE=$(git rev-list --max-parents=0 HEAD)..HEAD
+        else
+          RANGE="$PREV_TAG..HEAD"
+        fi
+        # Generate changelog with git-cliff and cliff.toml configuration
+        git-cliff -v --strip header -o .changelog.md --config cliff.toml --tag "$(basename $GITHUB_REF)" "$RANGE"
+        # Fallback if changelog is empty
+        if [ ! -s ".changelog.md" ]; then
+          echo "No release notes. See commit history for details." > .changelog.md
+        fi
         echo "::set-output name=RELEASE_BODY::$(cat .changelog.md)"
     - name: Upload
       uses: svenstaro/upload-release-action@v2
